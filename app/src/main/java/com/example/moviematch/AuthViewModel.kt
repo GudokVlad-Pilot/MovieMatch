@@ -11,10 +11,17 @@ import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.FirebaseFirestore
 
-class AuthViewModel : ViewModel() {
+import android.app.Application
+import android.content.Context
+import androidx.lifecycle.AndroidViewModel
+
+
+class AuthViewModel(application: Application) : AndroidViewModel(application) {
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
     private val usersCollection: CollectionReference = firestore.collection("users")
+
+    private val sharedPreferences = application.getSharedPreferences("MovieMatchPrefs", Context.MODE_PRIVATE)
 
     // Reactive state for user data
     var displayName by mutableStateOf("")
@@ -33,6 +40,14 @@ class AuthViewModel : ViewModel() {
     // Initialize with current user details
     init {
         updateUserState()
+    }
+
+    fun setRememberMe(value: Boolean) {
+        sharedPreferences.edit().putBoolean("REMEMBER_ME", value).apply()
+    }
+
+    private fun getRememberMe(): Boolean {
+        return sharedPreferences.getBoolean("REMEMBER_ME", false)
     }
 
     /**
@@ -54,8 +69,8 @@ class AuthViewModel : ViewModel() {
                     val currentUser = auth.currentUser
 
                     // Update the user's Firebase Authentication profile with display name
-                    val profileUpdates = UserProfileChangeRequest.Builder()
-                        .setDisplayName(displayName) // Set display name
+                    val profileUpdates = com.google.firebase.auth.UserProfileChangeRequest.Builder()
+                        .setDisplayName(displayName)
                         .build()
 
                     currentUser?.updateProfile(profileUpdates)?.addOnCompleteListener { profileTask ->
@@ -98,15 +113,16 @@ class AuthViewModel : ViewModel() {
     /**
      * Logs in a user with the provided email and password.
      */
-    fun loginUser(email: String, password: String, onResult: (String) -> Unit) {
+    fun loginUser(email: String, password: String, rememberMe: Boolean, onResult: (String) -> Unit) {
         auth.signInWithEmailAndPassword(email, password)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     val user = auth.currentUser
                     if (user?.isEmailVerified == true) {
+                        setRememberMe(rememberMe)
                         onResult("Login successful.")
                     } else {
-                        auth.signOut() // Prevent access for unverified users
+                        auth.signOut()
                         onResult("Please verify your email before logging in.")
                     }
                 } else {
@@ -120,20 +136,18 @@ class AuthViewModel : ViewModel() {
      */
     fun logout() {
         auth.signOut()
+        setRememberMe(false) // Clear "Remember Me" state
         clearUserState()
     }
 
     /**
      * Updates the ViewModel's state based on the currently logged-in user.
-     * Fetches the username, display name, and email from Firestore.
      */
     private fun updateUserState() {
         val user = auth.currentUser
         isLoggedIn = user != null
         if (user != null) {
             displayName = user.displayName ?: "User"
-
-            // Fetch the username, display name, and email from Firestore
             fetchUserDataFromFirestore(user.uid)
         } else {
             clearUserState()
@@ -150,8 +164,8 @@ class AuthViewModel : ViewModel() {
                     username = document.getString("username") ?: ""
                     displayName = document.getString("displayName") ?: ""
                     email = document.getString("email") ?: ""
-                    name = document.getString("name") ?: ""  // Fetch name
-                    surname = document.getString("surname") ?: ""  // Fetch surname
+                    name = document.getString("name") ?: ""
+                    surname = document.getString("surname") ?: ""
                 }
             }
             .addOnFailureListener { exception ->
@@ -176,5 +190,12 @@ class AuthViewModel : ViewModel() {
      */
     fun getCurrentUser(): FirebaseUser? {
         return auth.currentUser
+    }
+
+    /**
+     * Checks if the user should stay logged in based on "Remember Me."
+     */
+    fun shouldStayLoggedIn(): Boolean {
+        return getRememberMe() && auth.currentUser != null
     }
 }

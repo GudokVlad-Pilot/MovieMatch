@@ -3,6 +3,7 @@ package com.example.moviematch.components
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.BottomAppBar
@@ -21,6 +22,11 @@ fun BottomNavigationBar(navController: NavController) {
         // Movies Tab
         IconButton(onClick = { navController.navigate("movies") }) {
             Icon(Icons.Default.PlayArrow, contentDescription = "Movies", tint = Color.White)
+        }
+
+        // Friends Tab
+        IconButton(onClick = { navController.navigate("friends") }) {
+            Icon(Icons.Default.Face, contentDescription = "Friends", tint = Color.White)
         }
 
         // Messages Tab

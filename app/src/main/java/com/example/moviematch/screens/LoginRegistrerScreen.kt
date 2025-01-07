@@ -38,6 +38,7 @@ fun LoginRegisterScreen(
     var displayName by remember { mutableStateOf("") }
     var isRegister by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
+    var rememberMe by remember { mutableStateOf(false) }
     var emptyFields = remember { mutableStateOf(setOf<String>()) } // Track empty fields
 
     // Helper function to validate if fields are empty
@@ -154,42 +155,34 @@ fun LoginRegisterScreen(
             keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() })
         )
         Spacer(modifier = Modifier.height(8.dp))
+        if (!isRegister) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = rememberMe,
+                    onCheckedChange = { rememberMe = it }
+                )
+                Text(text = "Remember Me")
+            }
+        }
 
         // Submit Button
         Button(onClick = {
-            if (validateFields()) {
-                if (isRegister) {
-                    // Generate displayName by combining name and surname
-                    displayName = "$name $surname"
-
-                    viewModel.registerUser(
-                        email = email,
-                        password = password,
-                        name = name,
-                        surname = surname,
-                        username = username,
-                        displayName = displayName // Pass the displayName
-                    ) { result ->
-                        if (result.contains("successful", ignoreCase = true)) {
-                            message = "Registration successful. Please verify your email."
-                        } else {
-                            message = result
-                        }
-                    }
-                } else {
-                    viewModel.loginUser(
-                        email = email,
-                        password = password
-                    ) { result ->
-                        if (result.contains("successful", ignoreCase = true)) {
-                            navController.navigate("movies") // Navigate only on success
-                        } else {
-                            message = result
-                        }
-                    }
+            if (isRegister) {
+                displayName = "$name $surname"
+                viewModel.registerUser(email, password, name, surname, username, displayName) { result ->
+                    message = result
                 }
             } else {
-                message = "Please fill in all the fields"
+                viewModel.loginUser(email, password, rememberMe) { result ->
+                    if (result.contains("successful", ignoreCase = true)) {
+                        navController.navigate("movies")
+                    } else {
+                        message = result
+                    }
+                }
             }
         }) {
             Text(text = if (isRegister) "Register" else "Login")
