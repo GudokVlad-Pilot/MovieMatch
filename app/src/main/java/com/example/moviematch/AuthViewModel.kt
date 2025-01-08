@@ -198,4 +198,73 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     fun shouldStayLoggedIn(): Boolean {
         return getRememberMe() && auth.currentUser != null
     }
+
+    /**
+     * Retrieves all registered users' usernames from Firestore.
+     */
+    fun fetchAllUsernames(onResult: (List<String>) -> Unit) {
+        usersCollection.get()
+            .addOnSuccessListener { querySnapshot ->
+                val usernames = mutableListOf<String>()
+                for (document in querySnapshot.documents) {
+                    val username = document.getString("username")
+                    if (!username.isNullOrEmpty()) {
+                        usernames.add(username)
+                    }
+                }
+                onResult(usernames) // Return the list of usernames
+            }
+            .addOnFailureListener { exception ->
+                Log.e("AuthViewModel", "Failed to fetch usernames: ${exception.message}")
+                onResult(emptyList()) // Return an empty list in case of failure
+            }
+    }
+
+    fun addFriend(username2: String, onResult: (String) -> Unit) {
+        // Check if the user is logged in
+        val currentUser = auth.currentUser
+        if (currentUser != null) {
+            val username1 = this.username // Current user's username
+
+            // Create a document name as a combination of both usernames (order doesn't matter)
+            val friendDocumentName = if (username1 < username2) {
+                "$username1-$username2"
+            } else {
+                "$username2-$username1"
+            }
+
+            // Create the document data
+            val friendData = hashMapOf(
+                "username1" to username1,
+                "username2" to username2
+            )
+
+            // Add the friend document to Firestore under "friends" collection
+            val friendsCollection = firestore.collection("friends")
+
+            // Check if the document already exists to avoid duplicates
+            friendsCollection.document(friendDocumentName).get()
+                .addOnSuccessListener { documentSnapshot ->
+                    if (documentSnapshot.exists()) {
+                        // Document already exists
+                        onResult("This friendship already exists.")
+                    } else {
+                        // Document doesn't exist, so create it
+                        friendsCollection.document(friendDocumentName)
+                            .set(friendData)
+                            .addOnSuccessListener {
+                                onResult("Friendship request sent successfully.")
+                            }
+                            .addOnFailureListener { exception ->
+                                onResult("Failed to add friend: ${exception.message}")
+                            }
+                    }
+                }
+                .addOnFailureListener { exception ->
+                    onResult("Error checking friendship existence: ${exception.message}")
+                }
+        } else {
+            onResult("User is not logged in.")
+        }
+    }
 }
