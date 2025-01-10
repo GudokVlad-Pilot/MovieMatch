@@ -41,6 +41,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     var friendsList by mutableStateOf<List<String>>(emptyList())
         private set
 
+    // Reactive state for friends list
+    var requestsList by mutableStateOf<List<String>>(emptyList())
+        private set
+
     // Initialize with current user details
     init {
         updateUserState()
@@ -184,6 +188,15 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     fun fetchFriendsList() {
         getFriends { friends ->
             friendsList = friends // Update the mutable state with the fetched friends
+        }
+    }
+
+    /**
+     * Fetches the requests list from Firestore and updates the state.
+     */
+    fun fetchRequestsList() {
+        getRequests { requests ->
+            requestsList = requests // Update the mutable state with the fetched friends
         }
     }
 
@@ -332,4 +345,106 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             onResult(emptyList())
         }
     }
+
+    /**
+     * Retrieves the list of friends from Firestore.
+     */
+    fun getRequests(onResult: (List<String>) -> Unit) {
+        val currentUser = auth.currentUser
+        if (currentUser != null) {
+            val username2 = this.username // Assume `this.username` is the current user's username
+            val friendsCollection = firestore.collection("friends")
+            val requests = mutableListOf<String>()
+
+            // Fetch requests where the current user is "username2"
+            friendsCollection.whereEqualTo("username2", username2)
+                .get()
+                .addOnSuccessListener { querySnapshot ->
+                    querySnapshot.documents.forEach { document ->
+                        val username1 = document.getString("username1")
+                        val status = document.getString("status")
+                        if (status == "pending" && !username1.isNullOrEmpty()) {
+                            requests.add(username1) // Add the requesting user's username
+                        }
+                    }
+
+                    onResult(requests) // Return the filtered requests list
+                }
+                .addOnFailureListener { exception ->
+                    Log.e("AuthViewModel", "Error fetching requests: ${exception.message}")
+                    onResult(emptyList()) // Return an empty list on failure
+                }
+        } else {
+            onResult(emptyList()) // Return an empty list if the user is not logged in
+        }
+    }
+
+
+    fun acceptFriendRequest(username1: String, username2: String, onResult: (String) -> Unit) {
+        val friendDocumentName = if (username1 < username2) {
+            "$username1-$username2"
+        } else {
+            "$username2-$username1"
+        }
+
+        val friendsCollection = firestore.collection("friends")
+
+        // Check if the document exists
+        friendsCollection.document(friendDocumentName).get()
+            .addOnSuccessListener { documentSnapshot ->
+                if (documentSnapshot.exists()) {
+                    val currentStatus = documentSnapshot.getString("status")
+                    if (currentStatus == "pending") {
+                        // Change the status to 'accepted'
+                        friendsCollection.document(friendDocumentName)
+                            .update("status", "accepted")
+                            .addOnSuccessListener {
+                                onResult("Friend request accepted.")
+                            }
+                            .addOnFailureListener { exception ->
+                                onResult("Failed to accept friend request: ${exception.message}")
+                            }
+                    } else {
+                        onResult("The status is not pending. Cannot accept.")
+                    }
+                } else {
+                    onResult("Friend request not found.")
+                }
+            }
+            .addOnFailureListener { exception ->
+                onResult("Error checking friend request: ${exception.message}")
+            }
+    }
+
+    fun deleteFriendRequest(username1: String, username2: String, onResult: (String) -> Unit) {
+        val friendDocumentName = if (username1 < username2) {
+            "$username1-$username2"
+        } else {
+            "$username2-$username1"
+        }
+
+        val friendsCollection = firestore.collection("friends")
+
+        // Check if the document exists
+        friendsCollection.document(friendDocumentName).get()
+            .addOnSuccessListener { documentSnapshot ->
+                if (documentSnapshot.exists()) {
+                    // Delete the document
+                    friendsCollection.document(friendDocumentName)
+                        .delete()
+                        .addOnSuccessListener {
+                            onResult("Friend request deleted.")
+                        }
+                        .addOnFailureListener { exception ->
+                            onResult("Failed to delete friend request: ${exception.message}")
+                        }
+                } else {
+                    onResult("Friend request not found.")
+                }
+            }
+            .addOnFailureListener { exception ->
+                onResult("Error checking friend request: ${exception.message}")
+            }
+    }
+
 }

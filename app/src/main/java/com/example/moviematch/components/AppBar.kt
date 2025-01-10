@@ -27,8 +27,6 @@ import com.example.moviematch.AuthViewModel
 fun AppBar(
     viewModel: AuthViewModel,
     onProfileClick: () -> Unit,
-    onMessagesClick: () -> Unit,
-    onSearchClick: () -> Unit
 ) {
     // Get the first letter of the username (use username instead of displayName)
     val firstLetter = viewModel.username.firstOrNull()?.uppercase() ?: ""
@@ -36,16 +34,6 @@ fun AppBar(
     TopAppBar(
         title = { Text(text = "MovieMatch") },
         actions = {
-            // Messages Button
-            IconButton(onClick = onMessagesClick) {
-                Icon(Icons.Default.Email, contentDescription = "Messages")
-            }
-
-            // Search Button
-            IconButton(onClick = onSearchClick) {
-                Icon(Icons.Default.Search, contentDescription = "Search")
-            }
-
             // Profile Circle (if logged in)
             if (viewModel.isLoggedIn) {
                 Box(
