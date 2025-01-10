@@ -67,5 +67,6 @@ dependencies {
     implementation(libs.coil.compose) // Coil
     implementation(libs.datastore.preferences)  // Added datastore-preferences
     implementation(libs.kotlinx.coroutines.android)  // Added kotlinx-coroutines-android
+    implementation(libs.accompanist.swiperefresh) //Swipe refresh
 
 }

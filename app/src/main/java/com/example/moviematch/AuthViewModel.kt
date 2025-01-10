@@ -236,7 +236,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             // Create the document data
             val friendData = hashMapOf(
                 "username1" to username1,
-                "username2" to username2
+                "username2" to username2,
+                "status" to "pending"
             )
 
             // Add the friend document to Firestore under "friends" collection
@@ -265,6 +266,55 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 }
         } else {
             onResult("User is not logged in.")
+        }
+    }
+    fun getFriends(onResult: (List<String>) -> Unit) {
+        // Get the current logged-in user
+        val currentUser = auth.currentUser
+        if (currentUser != null) {
+            val username1 = this.username // The current user's username
+
+            val friendsCollection = firestore.collection("friends")
+            val friendsList = mutableListOf<String>()
+
+            // Query the 'friends' collection for both directions: username1 and username2
+            friendsCollection.whereEqualTo("username1", username1)
+                .get()
+                .addOnSuccessListener { querySnapshot1 ->
+                    querySnapshot1.documents.forEach { document ->
+                        val username2 = document.getString("username2")
+                        val status = document.getString("status")
+                        if (status == "accepted" && !username2.isNullOrEmpty()) {
+                            friendsList.add(username2)
+                        }
+                    }
+
+                    // Check for the reverse direction: username2 is the current user
+                    friendsCollection.whereEqualTo("username2", username1)
+                        .get()
+                        .addOnSuccessListener { querySnapshot2 ->
+                            querySnapshot2.documents.forEach { document ->
+                                val username1 = document.getString("username1")
+                                val status = document.getString("status")
+                                if (status == "accepted" && !username1.isNullOrEmpty()) {
+                                    friendsList.add(username1)
+                                }
+                            }
+
+                            // Return the list of friends
+                            onResult(friendsList)
+                        }
+                        .addOnFailureListener { exception ->
+                            Log.e("AuthViewModel", "Error fetching friends: ${exception.message}")
+                            onResult(emptyList()) // Return an empty list in case of failure
+                        }
+                }
+                .addOnFailureListener { exception ->
+                    Log.e("AuthViewModel", "Error fetching friends: ${exception.message}")
+                    onResult(emptyList()) // Return an empty list in case of failure
+                }
+        } else {
+            onResult(emptyList()) // If the user is not logged in, return an empty list
         }
     }
 }
