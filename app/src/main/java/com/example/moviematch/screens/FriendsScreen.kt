@@ -2,13 +2,23 @@ package com.example.moviematch.screens
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CardElevation
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -34,30 +44,23 @@ import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 
 @Composable
 fun FriendsScreen(navController: NavController, authViewModel: AuthViewModel = viewModel()) {
-    // A state to hold the list of usernames
+    // State holders
     val usernames = remember { mutableStateOf<List<String>>(emptyList()) }
-    val friendsList = remember { mutableStateOf<List<String>>(emptyList()) }
-    val searchQuery = remember { mutableStateOf("") } // State for the search input
-    val resultMessage = remember { mutableStateOf("") } // State to show the result message
+    val friendsList = authViewModel.friendsList // Observe the friendsList from ViewModel
+    val searchQuery = remember { mutableStateOf("") }
+    val resultMessage = remember { mutableStateOf("") }
+    val isRefreshing = remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    // Fetch the usernames and friends list when the Composable is first composed
+    // Fetch usernames when the screen is first composed
     LaunchedEffect(Unit) {
         authViewModel.fetchAllUsernames { fetchedUsernames ->
-            // Filter out the current user's username if they are in the list
             val filtered = fetchedUsernames.filter { it != authViewModel.username }
             usernames.value = filtered
         }
-        authViewModel.getFriends { fetchedFriends ->
-            friendsList.value = fetchedFriends
-        }
     }
 
-    val isRefreshing = remember { mutableStateOf(false) } // State to track refresh status
-
-    // Check if the search query matches any username (case insensitive)
     val userExists = usernames.value.any { it.equals(searchQuery.value, ignoreCase = true) }
-    val filteredFriends = friendsList.value
 
     Scaffold(
         topBar = {
@@ -74,12 +77,13 @@ fun FriendsScreen(navController: NavController, authViewModel: AuthViewModel = v
     ) { paddingValues ->
         SwipeRefresh(
             state = rememberSwipeRefreshState(isRefreshing = isRefreshing.value),
-            onRefresh = { authViewModel.getFriends { updatedFriends ->
-                friendsList.value = updatedFriends
-            } } // Refresh subjects on pull
+            onRefresh = {
+                isRefreshing.value = true
+                authViewModel.fetchFriendsList()
+                isRefreshing.value = false
+            }
         ) {
             Box(
-                contentAlignment = Alignment.TopCenter,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
@@ -90,35 +94,33 @@ fun FriendsScreen(navController: NavController, authViewModel: AuthViewModel = v
                         .fillMaxSize()
                         .padding(16.dp)
                 ) {
-                    // Add "Your friends" header at the top
+                    // Header: "Your friends"
                     Text(
-                        text = "Your friends",
+                        text = "Your Friends",
                         style = MaterialTheme.typography.headlineLarge,
-                        modifier = Modifier.padding(bottom = 16.dp) // Add space below the header
+                        modifier = Modifier.padding(bottom = 16.dp)
                     )
 
-                    // Search box to filter usernames
+                    // Search bar
                     TextField(
                         value = searchQuery.value,
                         onValueChange = { searchQuery.value = it },
                         label = { Text("Search for a friend") },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.medium
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Button to check if user exists and add friend
+                    // Add friend button
                     Button(
                         onClick = {
                             if (userExists) {
-                                // Call the addFriend function to add the user to friends
                                 authViewModel.addFriend(searchQuery.value) { message ->
                                     resultMessage.value = message
                                     if (message.contains("success", ignoreCase = true)) {
-                                        // Refresh friends list after successfully adding a friend
-                                        authViewModel.getFriends { updatedFriends ->
-                                            friendsList.value = updatedFriends
-                                        }
+                                        authViewModel.fetchFriendsList()
                                     }
                                 }
                             } else {
@@ -127,40 +129,41 @@ fun FriendsScreen(navController: NavController, authViewModel: AuthViewModel = v
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Add friend")
+                        Text("Add Friend")
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Result message
+                    if (resultMessage.value.isNotEmpty()) {
+                        Text(
+                            text = resultMessage.value,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (resultMessage.value.contains("success", ignoreCase = true))
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(8.dp)
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Display the result message
-                    Text(
-                        text = resultMessage.value,
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(8.dp)
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Friends list header
+                    // Friends List
                     Text(
                         text = "Friends List",
                         style = MaterialTheme.typography.headlineSmall,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
 
-                    // Display the filtered list of friends
+                    // Display the list of friends
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f) // Let the LazyColumn take the remaining vertical space
+                            .weight(1f)
                     ) {
-                        items(filteredFriends.size) { index ->
-                            val friend = filteredFriends[index]
-                            Text(
-                                text = friend,
-                                style = MaterialTheme.typography.bodyLarge,
-                                modifier = Modifier.padding(8.dp)
-                            )
+                        items(friendsList) { friend ->
+                            FriendItem(friend)
                         }
                     }
                 }
@@ -168,4 +171,36 @@ fun FriendsScreen(navController: NavController, authViewModel: AuthViewModel = v
         }
     }
 }
+
+@Composable
+fun FriendItem(friend: String) {
+    Card(
+        shape = MaterialTheme.shapes.medium,
+        elevation = CardDefaults.cardElevation(4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Person,
+                contentDescription = "Friend Icon",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(
+                text = friend,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
 

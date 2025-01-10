@@ -37,6 +37,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     var surname by mutableStateOf("")
         private set
 
+    // Reactive state for friends list
+    var friendsList by mutableStateOf<List<String>>(emptyList())
+        private set
+
     // Initialize with current user details
     init {
         updateUserState()
@@ -149,6 +153,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         if (user != null) {
             displayName = user.displayName ?: "User"
             fetchUserDataFromFirestore(user.uid)
+            fetchFriendsList() // Fetch the friends list when the user state is updated
         } else {
             clearUserState()
         }
@@ -174,6 +179,15 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * Fetches the friends list from Firestore and updates the state.
+     */
+    fun fetchFriendsList() {
+        getFriends { friends ->
+            friendsList = friends // Update the mutable state with the fetched friends
+        }
+    }
+
+    /**
      * Clears the ViewModel's state when the user logs out.
      */
     private fun clearUserState() {
@@ -182,6 +196,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         email = ""
         name = ""
         surname = ""
+        friendsList = emptyList() // Clear the friends list
         isLoggedIn = false
     }
 
@@ -268,16 +283,18 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             onResult("User is not logged in.")
         }
     }
+
+
+    /**
+     * Retrieves the list of friends from Firestore.
+     */
     fun getFriends(onResult: (List<String>) -> Unit) {
-        // Get the current logged-in user
         val currentUser = auth.currentUser
         if (currentUser != null) {
-            val username1 = this.username // The current user's username
-
+            val username1 = this.username
             val friendsCollection = firestore.collection("friends")
-            val friendsList = mutableListOf<String>()
+            val friends = mutableListOf<String>()
 
-            // Query the 'friends' collection for both directions: username1 and username2
             friendsCollection.whereEqualTo("username1", username1)
                 .get()
                 .addOnSuccessListener { querySnapshot1 ->
@@ -285,11 +302,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                         val username2 = document.getString("username2")
                         val status = document.getString("status")
                         if (status == "accepted" && !username2.isNullOrEmpty()) {
-                            friendsList.add(username2)
+                            friends.add(username2)
                         }
                     }
 
-                    // Check for the reverse direction: username2 is the current user
                     friendsCollection.whereEqualTo("username2", username1)
                         .get()
                         .addOnSuccessListener { querySnapshot2 ->
@@ -297,24 +313,23 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                                 val username1 = document.getString("username1")
                                 val status = document.getString("status")
                                 if (status == "accepted" && !username1.isNullOrEmpty()) {
-                                    friendsList.add(username1)
+                                    friends.add(username1)
                                 }
                             }
 
-                            // Return the list of friends
-                            onResult(friendsList)
+                            onResult(friends) // Return the combined friends list
                         }
                         .addOnFailureListener { exception ->
                             Log.e("AuthViewModel", "Error fetching friends: ${exception.message}")
-                            onResult(emptyList()) // Return an empty list in case of failure
+                            onResult(emptyList())
                         }
                 }
                 .addOnFailureListener { exception ->
                     Log.e("AuthViewModel", "Error fetching friends: ${exception.message}")
-                    onResult(emptyList()) // Return an empty list in case of failure
+                    onResult(emptyList())
                 }
         } else {
-            onResult(emptyList()) // If the user is not logged in, return an empty list
+            onResult(emptyList())
         }
     }
 }
