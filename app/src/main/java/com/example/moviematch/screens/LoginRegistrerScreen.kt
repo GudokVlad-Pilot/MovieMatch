@@ -32,6 +32,7 @@ fun LoginRegisterScreen(
     // State variables
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     var surname by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
@@ -39,9 +40,9 @@ fun LoginRegisterScreen(
     var isRegister by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
     var rememberMe by remember { mutableStateOf(false) }
-    var emptyFields = remember { mutableStateOf(setOf<String>()) } // Track empty fields
+    var emptyFields = remember { mutableStateOf(setOf<String>()) }
 
-    // Helper function to validate if fields are empty
+    // Helper function to validate if fields are empty and confirm password
     fun validateFields(): Boolean {
         val emptyFieldsList = mutableSetOf<String>()
 
@@ -51,16 +52,25 @@ fun LoginRegisterScreen(
             if (name.isEmpty()) emptyFieldsList.add("Name")
             if (surname.isEmpty()) emptyFieldsList.add("Surname")
             if (username.isEmpty()) emptyFieldsList.add("Username")
+            if (confirmPassword.isEmpty()) emptyFieldsList.add("ConfirmPassword")
+            if (password != confirmPassword) emptyFieldsList.add("PasswordMismatch")
         }
 
         emptyFields.value = emptyFieldsList
+
+        message = when {
+            emptyFieldsList.contains("PasswordMismatch") -> "Passwords do not match."
+            emptyFieldsList.isNotEmpty() -> "Please fill out all fields."
+            else -> ""
+        }
+
         return emptyFieldsList.isEmpty()
     }
 
-
     // Reset empty fields when switching between Register/Login modes
     LaunchedEffect(isRegister) {
-        emptyFields.value = setOf() // Reset empty fields whenever the mode changes
+        emptyFields.value = setOf()
+        message = ""
     }
 
     // Get the keyboard controller
@@ -155,32 +165,48 @@ fun LoginRegisterScreen(
             keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() })
         )
         Spacer(modifier = Modifier.height(8.dp))
+
         if (!isRegister) {
+            // Remember Me and Forgot Password
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Checkbox(
-                    checked = rememberMe,
-                    onCheckedChange = { rememberMe = it }
-                )
-                Text(text = "Remember Me")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = rememberMe,
+                        onCheckedChange = { rememberMe = it }
+                    )
+                    Text(text = "Remember Me")
+                }
+
+                TextButton(onClick = {
+                    // Navigate to "Forgot Password" screen or trigger recovery logic
+                    navController.navigate("forgotPassword")
+                }) {
+                    Text(text = "Forgot Password?")
+                }
             }
         }
 
         // Submit Button
         Button(onClick = {
-            if (isRegister) {
-                displayName = "$name $surname"
-                viewModel.registerUser(email, password, name, surname, username, displayName) { result ->
-                    message = result
-                }
-            } else {
-                viewModel.loginUser(email, password, rememberMe) { result ->
-                    if (result.contains("successful", ignoreCase = true)) {
-                        navController.navigate("movies")
-                    } else {
+            if (validateFields()) { // Ensure all required fields are filled
+                if (isRegister) {
+                    displayName = "$name $surname"
+                    viewModel.registerUser(email, password, name, surname, username, displayName) { result ->
                         message = result
+                    }
+                } else {
+                    viewModel.loginUser(email, password, rememberMe) { result ->
+                        if (result.contains("successful", ignoreCase = true)) {
+                            navController.navigate("movies")
+                        } else {
+                            message = result
+                        }
                     }
                 }
             }
@@ -188,13 +214,13 @@ fun LoginRegisterScreen(
             Text(text = if (isRegister) "Register" else "Login")
         }
 
-
         Spacer(modifier = Modifier.height(16.dp))
 
         // Toggle between Register and Login screens
         TextButton(onClick = {
             isRegister = !isRegister
             emptyFields.value = setOf()
+            message = ""
         }) {
             Text(
                 text = if (isRegister) "Already have an account? Log in" else "Don't have an account? Register"
@@ -203,7 +229,7 @@ fun LoginRegisterScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Display message after submission
+        // Display message after submission or validation
         if (message.isNotEmpty()) {
             Text(
                 text = message,
@@ -214,3 +240,4 @@ fun LoginRegisterScreen(
         }
     }
 }
+

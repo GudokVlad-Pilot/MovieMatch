@@ -119,6 +119,22 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * Sends a password reset email to the specified email address.
+     * The user can use the link in the email to reset their password.
+     */
+    fun resetPassword(email: String, onResult: (String) -> Unit) {
+        auth.sendPasswordResetEmail(email)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    onResult("Password reset email sent successfully. Please check your inbox.")
+                } else {
+                    onResult("Failed to send password reset email: ${task.exception?.message}")
+                }
+            }
+    }
+
+
+    /**
      * Logs in a user with the provided email and password.
      */
     fun loginUser(email: String, password: String, rememberMe: Boolean, onResult: (String) -> Unit) {

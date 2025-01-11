@@ -1,4 +1,4 @@
-package com.example.moviematch
+    package com.example.moviematch
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -6,6 +6,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.moviematch.screens.ForgotPasswordScreen
 import com.example.moviematch.screens.FriendsScreen
 import com.example.moviematch.screens.LandingScreen
 import com.example.moviematch.screens.LoginRegisterScreen
@@ -21,6 +22,7 @@ fun AppNavigation(startDestination: String) {
     NavHost(navController = navController, startDestination = startDestination) {
         composable("landing") { LandingScreen(navController) }
         composable("login") { LoginRegisterScreen(navController) }
+        composable("forgotPassword") { ForgotPasswordScreen(navController) }
         composable("movies") { MoviesScreen(navController) }
         composable("messages") { MessagesScreen(navController) }
         composable("friends") { FriendsScreen(navController) }
