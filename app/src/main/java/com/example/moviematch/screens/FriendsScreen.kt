@@ -87,9 +87,12 @@ fun FriendsScreen(navController: NavController, authViewModel: AuthViewModel = v
             state = rememberSwipeRefreshState(isRefreshing = isRefreshing.value),
             onRefresh = {
                 isRefreshing.value = true
-                authViewModel.fetchFriendsList()
-                authViewModel.fetchRequestsList()
-                isRefreshing.value = false
+                try {
+                    authViewModel.fetchFriendsList()
+                    authViewModel.fetchRequestsList()
+                } finally {
+                    isRefreshing.value = false
+                }
             }
         ) {
             Box(
@@ -191,7 +194,7 @@ fun FriendsScreen(navController: NavController, authViewModel: AuthViewModel = v
                             modifier = Modifier
                                 .fillMaxWidth()
                         ) {
-                            items(friendsList) { friend ->
+                            items(friendsList.sortedBy { it.lowercase() }) { friend ->
                                 FriendItem(friend)
                             }
                         }
@@ -214,7 +217,11 @@ fun FriendsScreen(navController: NavController, authViewModel: AuthViewModel = v
 }
 
 @Composable
-fun FriendItem(friend: String) {
+fun FriendItem(friend: String, authViewModel: AuthViewModel = viewModel()) {
+
+    val context = LocalContext.current
+    val friendDeleted = remember { mutableStateOf(false) }
+
     Card(
         shape = MaterialTheme.shapes.medium,
         elevation = CardDefaults.cardElevation(4.dp),
@@ -240,6 +247,43 @@ fun FriendItem(friend: String) {
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.weight(1f)
             )
+            if (!friendDeleted.value) {
+                IconButton(
+                    onClick = {
+                        val username1 = authViewModel.username // Current logged-in user's username
+                        val username2 = friend // The other user's username
+
+                        // Call the deleteFriendRequest function
+                        authViewModel.deleteFriend(username1, username2) { resultMessage ->
+                            // Show a Toast message
+                            Toast.makeText(context, resultMessage, Toast.LENGTH_SHORT).show()
+                        }
+                        authViewModel.fetchRequestsList()
+                        authViewModel.fetchFriendsList()
+
+                        // Mark the request as denied
+                        friendDeleted.value = true
+                    },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.errorContainer)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Cross",
+                        tint = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            } else {
+                // Show "Friend deleted" text
+                Text(
+                    text = "Friend deleted",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
         }
     }
 }
