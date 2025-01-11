@@ -14,6 +14,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
+import java.util.Locale
 
 
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
@@ -47,6 +48,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     // Initialize with current user details
     init {
+        FirebaseAuth.getInstance().setLanguageCode(Locale.getDefault().language)
         updateUserState()
     }
 
@@ -71,6 +73,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         displayName: String,
         onResult: (String) -> Unit
     ) {
+
         auth.createUserWithEmailAndPassword(email, password)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {

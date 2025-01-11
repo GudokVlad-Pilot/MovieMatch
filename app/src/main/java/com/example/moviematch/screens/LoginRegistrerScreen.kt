@@ -32,7 +32,7 @@ fun LoginRegisterScreen(
     // State variables
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var confirmPassword by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") } // New field for password confirmation
     var name by remember { mutableStateOf("") }
     var surname by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
@@ -40,7 +40,7 @@ fun LoginRegisterScreen(
     var isRegister by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
     var rememberMe by remember { mutableStateOf(false) }
-    var emptyFields = remember { mutableStateOf(setOf<String>()) }
+    var emptyFields = remember { mutableStateOf(setOf<String>()) } // Track empty fields
 
     // Helper function to validate if fields are empty and confirm password
     fun validateFields(): Boolean {
@@ -57,20 +57,12 @@ fun LoginRegisterScreen(
         }
 
         emptyFields.value = emptyFieldsList
-
-        message = when {
-            emptyFieldsList.contains("PasswordMismatch") -> "Passwords do not match."
-            emptyFieldsList.isNotEmpty() -> "Please fill out all fields."
-            else -> ""
-        }
-
         return emptyFieldsList.isEmpty()
     }
 
     // Reset empty fields when switching between Register/Login modes
     LaunchedEffect(isRegister) {
-        emptyFields.value = setOf()
-        message = ""
+        emptyFields.value = setOf() // Reset empty fields whenever the mode changes
     }
 
     // Get the keyboard controller
@@ -166,6 +158,25 @@ fun LoginRegisterScreen(
         )
         Spacer(modifier = Modifier.height(8.dp))
 
+        if (isRegister) {
+            // Confirm Password
+            TextField(
+                value = confirmPassword,
+                onValueChange = { confirmPassword = it },
+                label = { Text(text = "Confirm Password") },
+                modifier = Modifier.fillMaxWidth(),
+                visualTransformation = PasswordVisualTransformation(),
+                colors = TextFieldDefaults.textFieldColors(
+                    containerColor = if ("ConfirmPassword" in emptyFields.value || "PasswordMismatch" in emptyFields.value) Color.Red else Color.Transparent
+                ),
+                singleLine = true,
+                maxLines = 1,
+                keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() })
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
         if (!isRegister) {
             // Remember Me and Forgot Password
             Row(
@@ -220,7 +231,6 @@ fun LoginRegisterScreen(
         TextButton(onClick = {
             isRegister = !isRegister
             emptyFields.value = setOf()
-            message = ""
         }) {
             Text(
                 text = if (isRegister) "Already have an account? Log in" else "Don't have an account? Register"
@@ -229,7 +239,7 @@ fun LoginRegisterScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Display message after submission or validation
+        // Display message after submission
         if (message.isNotEmpty()) {
             Text(
                 text = message,
@@ -240,4 +250,3 @@ fun LoginRegisterScreen(
         }
     }
 }
-
