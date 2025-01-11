@@ -2,6 +2,7 @@ package com.example.moviematch.screens
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -195,7 +196,10 @@ fun FriendsScreen(navController: NavController, authViewModel: AuthViewModel = v
                                 .fillMaxWidth()
                         ) {
                             items(friendsList.sortedBy { it.lowercase() }) { friend ->
-                                FriendItem(friend)
+                                FriendItem(
+                                    friend,
+                                    onClick = { navController.navigate("friendDetail/$friend") },
+                                )
                             }
                         }
                     }
@@ -217,7 +221,7 @@ fun FriendsScreen(navController: NavController, authViewModel: AuthViewModel = v
 }
 
 @Composable
-fun FriendItem(friend: String, authViewModel: AuthViewModel = viewModel()) {
+fun FriendItem(friend: String, onClick: () -> Unit, authViewModel: AuthViewModel = viewModel()) {
 
     val context = LocalContext.current
     val friendDeleted = remember { mutableStateOf(false) }
@@ -228,6 +232,7 @@ fun FriendItem(friend: String, authViewModel: AuthViewModel = viewModel()) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
+            .clickable { onClick() } // Handle click event
     ) {
         Row(
             modifier = Modifier
@@ -287,6 +292,7 @@ fun FriendItem(friend: String, authViewModel: AuthViewModel = viewModel()) {
         }
     }
 }
+
 
 @Composable
 fun RequestItem(friend: String, authViewModel: AuthViewModel = viewModel()) {
