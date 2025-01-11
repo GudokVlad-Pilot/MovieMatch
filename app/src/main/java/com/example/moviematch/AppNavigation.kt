@@ -3,10 +3,13 @@
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.moviematch.screens.ForgotPasswordScreen
+import com.example.moviematch.screens.FriendDetailScreen
 import com.example.moviematch.screens.FriendsScreen
 import com.example.moviematch.screens.LandingScreen
 import com.example.moviematch.screens.LoginRegisterScreen
@@ -28,6 +31,13 @@ fun AppNavigation(startDestination: String) {
         composable("friends") { FriendsScreen(navController) }
         composable("search") { SearchScreen(navController) }
         composable("profile") { ProfileScreen(viewModel = viewModel(), navController = navController) }
+        composable(
+            "friendDetail/{username}",
+            arguments = listOf(navArgument("username") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            FriendDetailScreen(username = username, navController = navController)
+        }
     }
 }
 

@@ -14,6 +14,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
+import java.util.Locale
 
 
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
@@ -47,6 +48,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     // Initialize with current user details
     init {
+        FirebaseAuth.getInstance().setLanguageCode(Locale.getDefault().language)
         updateUserState()
     }
 
@@ -71,6 +73,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         displayName: String,
         onResult: (String) -> Unit
     ) {
+
         auth.createUserWithEmailAndPassword(email, password)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
@@ -460,6 +463,37 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             }
             .addOnFailureListener { exception ->
                 onResult("Error checking friend request: ${exception.message}")
+            }
+    }
+
+    fun deleteFriend(username1: String, username2: String, onResult: (String) -> Unit) {
+        val friendDocumentName = if (username1 < username2) {
+            "$username1-$username2"
+        } else {
+            "$username2-$username1"
+        }
+
+        val friendsCollection = firestore.collection("friends")
+
+        // Check if the document exists
+        friendsCollection.document(friendDocumentName).get()
+            .addOnSuccessListener { documentSnapshot ->
+                if (documentSnapshot.exists()) {
+                    // Delete the document
+                    friendsCollection.document(friendDocumentName)
+                        .delete()
+                        .addOnSuccessListener {
+                            onResult("${username2} deleted from your friends")
+                        }
+                        .addOnFailureListener { exception ->
+                            onResult("Failed to delete friend: ${exception.message}")
+                        }
+                } else {
+                    onResult("Friend not found.")
+                }
+            }
+            .addOnFailureListener { exception ->
+                onResult("Error checking friend: ${exception.message}")
             }
     }
 
