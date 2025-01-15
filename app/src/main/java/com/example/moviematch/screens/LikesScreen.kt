@@ -9,11 +9,11 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
 
 @Composable
-fun MessagesScreen(navController: NavController) {
+fun LikesScreen(navController: NavController) {
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier.fillMaxSize()
     ) {
-        Text(text = "Messages Screen")
+        Text(text = "Likes Screen")
     }
 }
