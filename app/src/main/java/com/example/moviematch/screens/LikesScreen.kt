@@ -117,7 +117,7 @@ fun LikesScreen(
 @Composable
 fun LikedList(movieList: List<String>, viewModel: MoviesViewModel = viewModel(), navController: NavController) {
     if (movieList.isEmpty()) {
-        Text(text = "No liked movies found.", style = MaterialTheme.typography.bodyMedium)
+        Text(text = "No movies found.", style = MaterialTheme.typography.bodyMedium)
     } else {
         // Use LazyVerticalGrid for a grid layout with 3 columns
         LazyVerticalGrid(

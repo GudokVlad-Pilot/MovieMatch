@@ -14,6 +14,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
+import com.google.android.gms.tasks.Tasks
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FieldValue
 import java.util.Locale
@@ -607,5 +608,49 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun deleteMoviesByStatus(
+        statusToDelete: String, // The single status (e.g., "liked", "disliked", or "watched")
+        onResult: (String) -> Unit
+    ) {
+        // Ensure the user is logged in
+        val currentUser = auth.currentUser
+        if (currentUser != null) {
+            val username = this.username
+            // Reference to the "movies" collection -> user's document -> "movie_status" sub-collection
+            val movieStatusRef = firestore.collection("movies")
+                .document(username)
+                .collection("movie_status")
+
+            // Query all movies with the specified status
+            movieStatusRef.whereEqualTo("status", statusToDelete)
+                .get()
+                .addOnSuccessListener { querySnapshot ->
+                    // If no documents are found
+                    if (querySnapshot.isEmpty) {
+                        onResult("No movies found with the status '$statusToDelete'.")
+                        return@addOnSuccessListener
+                    }
+
+                    // List to track delete tasks
+                    val deleteTasks = querySnapshot.documents.map { document ->
+                        movieStatusRef.document(document.id).delete()
+                    }
+
+                    // Wait for all delete tasks to complete
+                    Tasks.whenAll(deleteTasks)
+                        .addOnSuccessListener {
+                            onResult("All movies with the status '$statusToDelete' were successfully deleted.")
+                        }
+                        .addOnFailureListener { exception ->
+                            onResult("Failed to delete movies: ${exception.message}")
+                        }
+                }
+                .addOnFailureListener { exception ->
+                    onResult("Error fetching movies with status '$statusToDelete': ${exception.message}")
+                }
+        } else {
+            onResult("User is not logged in.")
+        }
+    }
 
 }

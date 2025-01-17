@@ -1,5 +1,6 @@
 package com.example.moviematch.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -32,9 +33,10 @@ import com.example.moviematch.movies.Movie
 import com.example.moviematch.movies.MoviesViewModel
 
 @Composable
-fun SearchScreen(navController: NavController,
-                 viewModel: MoviesViewModel = viewModel(),
-                 authViewModel: AuthViewModel = viewModel()
+fun SearchScreen(
+    navController: NavController,
+    viewModel: MoviesViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel()
 ) {
     var query by remember { mutableStateOf("") }
     val movies by viewModel.movies.observeAsState(emptyList())
@@ -55,7 +57,6 @@ fun SearchScreen(navController: NavController,
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -80,7 +81,7 @@ fun SearchScreen(navController: NavController,
                 // Show results in a LazyColumn
                 LazyColumn {
                     items(movies) { movie ->
-                        MovieItem(movie = movie)
+                        MovieItem(movie = movie, navController = navController)
                     }
                 }
             }
@@ -89,8 +90,15 @@ fun SearchScreen(navController: NavController,
 }
 
 @Composable
-fun MovieItem(movie: Movie) {
-    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+fun MovieItem(movie: Movie, navController: NavController) {
+    Column(
+        modifier = Modifier
+            .padding(vertical = 8.dp)
+            .clickable {
+                // Navigate to MovieDetailScreen with the movie ID
+                navController.navigate("movieDetail/${movie.id}")
+            }
+    ) {
         Text(text = movie.title, style = MaterialTheme.typography.headlineSmall)
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -108,3 +116,4 @@ fun MovieItem(movie: Movie) {
         Text(text = movie.overview, style = MaterialTheme.typography.bodyMedium)
     }
 }
+
