@@ -39,7 +39,7 @@ fun AppNavigation(startDestination: String) {
             arguments = listOf(navArgument("username") { type = NavType.StringType })
         ) { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
-            FriendDetailScreen(username = username, navController = navController)
+            FriendDetailScreen(friendsUsername = username, navController = navController)
         }
         composable("movieDetail/{movieId}") { backStackEntry ->
             val movieId = backStackEntry.arguments?.getString("movieId")?.toInt() ?: return@composable
