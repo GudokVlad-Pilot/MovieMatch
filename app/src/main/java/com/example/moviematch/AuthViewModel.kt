@@ -14,6 +14,9 @@ import com.google.firebase.firestore.FirebaseFirestore
 import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
+import com.google.android.gms.tasks.Tasks
+import com.google.firebase.firestore.DocumentReference
+import com.google.firebase.firestore.FieldValue
 import java.util.Locale
 
 
@@ -495,6 +498,159 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             .addOnFailureListener { exception ->
                 onResult("Error checking friend: ${exception.message}")
             }
+    }
+
+    /**
+     * Adds a movie status ("liked" or "disliked") to the Firestore database.
+     * It creates a sub-collection named after the user's username inside the "movies" collection,
+     * and within that, creates a sub-collection named after the movie ID with a "status" field.
+     */
+    fun addMovieStatus(movieId: String, status: String, onResult: (String) -> Unit) {
+        // Validate that the status is valid
+        if (status != "liked" && status != "disliked" && status != "watched") {
+            onResult("Invalid status. Status must be either 'liked', 'disliked', or 'watched'.")
+            return
+        }
+
+        // Get the currently logged-in user
+        val currentUser = auth.currentUser
+        if (currentUser != null) {
+            val username = this.username // Use display name or UID as fallback
+
+            // Reference to the parent document in the "movies" collection
+            val userMovieDocRef = firestore.collection("movies").document(username)
+
+            // Check if the parent document exists
+            userMovieDocRef.get()
+                .addOnSuccessListener { documentSnapshot ->
+                    if (!documentSnapshot.exists()) {
+                        // If the parent document doesn't exist, create it with minimal data
+                        userMovieDocRef.set(mapOf("placeholder" to true))
+                            .addOnSuccessListener {
+                                // Proceed to add/update the sub-collection document
+                                addMovieToSubCollection(userMovieDocRef, movieId, status, onResult)
+                            }
+                            .addOnFailureListener { exception ->
+                                onResult("Failed to create user document: ${exception.message}")
+                            }
+                    } else {
+                        // Parent document exists, proceed to add/update the sub-collection document
+                        addMovieToSubCollection(userMovieDocRef, movieId, status, onResult)
+                    }
+                }
+                .addOnFailureListener { exception ->
+                    onResult("Failed to check user document: ${exception.message}")
+                }
+        } else {
+            onResult("User is not logged in.")
+        }
+    }
+
+    // Helper function to add or update a movie in the sub-collection
+    private fun addMovieToSubCollection(
+        userMovieDocRef: DocumentReference,
+        movieId: String,
+        status: String,
+        onResult: (String) -> Unit
+    ) {
+        // Reference to the sub-collection "movie_status"
+        val movieStatusRef = userMovieDocRef.collection("movie_status")
+
+        // Data to store in the sub-collection document
+        val movieData = mapOf(
+            "status" to status,
+            "movieId" to movieId,
+            "updated_at" to FieldValue.serverTimestamp()
+        )
+
+        // Add or update the document in the sub-collection
+        movieStatusRef.document(movieId).set(movieData)
+            .addOnSuccessListener {
+                onResult("Movie status updated successfully.")
+            }
+            .addOnFailureListener { exception ->
+                onResult("Failed to update movie status: ${exception.message}")
+            }
+    }
+
+    fun getMoviesByStatus(username: String, status: String, onResult: (List<String>) -> Unit) {
+        // Ensure that the status is valid
+        if (status != "liked" && status != "disliked" && status != "watched") {
+            onResult(emptyList()) // Return an empty list if the status is invalid
+            return
+        }
+
+        // Get the currently logged-in user
+        val currentUser = auth.currentUser
+        if (currentUser != null) {
+
+            // Reference to the "movies" collection -> user's document -> "movie_status" sub-collection
+            val movieStatusRef = firestore.collection("movies")
+                .document(username)
+                .collection("movie_status")
+
+            // Query the movies that match the given status
+            movieStatusRef.whereEqualTo("status", status)
+                .get()
+                .addOnSuccessListener { querySnapshot ->
+                    // Extract movie IDs from the results
+                    val movieList = querySnapshot.documents.mapNotNull { document ->
+                        document.getString("movieId")
+                    }
+                    onResult(movieList) // Return the list of movie IDs
+                }
+                .addOnFailureListener { exception ->
+                    Log.e("AuthViewModel", "Error fetching movies by status: ${exception.message}")
+                    onResult(emptyList()) // Return an empty list in case of failure
+                }
+        } else {
+            onResult(emptyList()) // Return an empty list if the user is not logged in
+        }
+    }
+
+    fun deleteMoviesByStatus(
+        statusToDelete: String, // The single status (e.g., "liked", "disliked", or "watched")
+        onResult: (String) -> Unit
+    ) {
+        // Ensure the user is logged in
+        val currentUser = auth.currentUser
+        if (currentUser != null) {
+            val username = this.username
+            // Reference to the "movies" collection -> user's document -> "movie_status" sub-collection
+            val movieStatusRef = firestore.collection("movies")
+                .document(username)
+                .collection("movie_status")
+
+            // Query all movies with the specified status
+            movieStatusRef.whereEqualTo("status", statusToDelete)
+                .get()
+                .addOnSuccessListener { querySnapshot ->
+                    // If no documents are found
+                    if (querySnapshot.isEmpty) {
+                        onResult("No movies found with the status '$statusToDelete'.")
+                        return@addOnSuccessListener
+                    }
+
+                    // List to track delete tasks
+                    val deleteTasks = querySnapshot.documents.map { document ->
+                        movieStatusRef.document(document.id).delete()
+                    }
+
+                    // Wait for all delete tasks to complete
+                    Tasks.whenAll(deleteTasks)
+                        .addOnSuccessListener {
+                            onResult("All movies with the status '$statusToDelete' were successfully deleted.")
+                        }
+                        .addOnFailureListener { exception ->
+                            onResult("Failed to delete movies: ${exception.message}")
+                        }
+                }
+                .addOnFailureListener { exception ->
+                    onResult("Error fetching movies with status '$statusToDelete': ${exception.message}")
+                }
+        } else {
+            onResult("User is not logged in.")
+        }
     }
 
 }

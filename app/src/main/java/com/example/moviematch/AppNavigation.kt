@@ -12,13 +12,15 @@ import com.example.moviematch.screens.ForgotPasswordScreen
 import com.example.moviematch.screens.FriendDetailScreen
 import com.example.moviematch.screens.FriendsScreen
 import com.example.moviematch.screens.LandingScreen
+import com.example.moviematch.screens.LikesScreen
 import com.example.moviematch.screens.LoginRegisterScreen
-import com.example.moviematch.screens.MessagesScreen
+import com.example.moviematch.screens.MovieDetailScreen
 import com.example.moviematch.screens.MoviesScreen
 import com.example.moviematch.screens.ProfileScreen
 import com.example.moviematch.screens.SearchScreen
+import com.example.moviematch.screens.SettingsScreen
 
-@Composable
+    @Composable
 fun AppNavigation(startDestination: String) {
     val navController = rememberNavController()
 
@@ -27,16 +29,21 @@ fun AppNavigation(startDestination: String) {
         composable("login") { LoginRegisterScreen(navController) }
         composable("forgotPassword") { ForgotPasswordScreen(navController) }
         composable("movies") { MoviesScreen(navController) }
-        composable("messages") { MessagesScreen(navController) }
+        composable("likes") { LikesScreen(navController) }
         composable("friends") { FriendsScreen(navController) }
         composable("search") { SearchScreen(navController) }
+        composable("settings") { SettingsScreen(navController) }
         composable("profile") { ProfileScreen(viewModel = viewModel(), navController = navController) }
         composable(
             "friendDetail/{username}",
             arguments = listOf(navArgument("username") { type = NavType.StringType })
         ) { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
-            FriendDetailScreen(username = username, navController = navController)
+            FriendDetailScreen(friendsUsername = username, navController = navController)
+        }
+        composable("movieDetail/{movieId}") { backStackEntry ->
+            val movieId = backStackEntry.arguments?.getString("movieId")?.toInt() ?: return@composable
+            MovieDetailScreen(movieId = movieId, navController = navController)
         }
     }
 }
