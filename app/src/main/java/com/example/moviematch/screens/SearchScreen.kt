@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -25,6 +26,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.moviematch.AuthViewModel
+import com.example.moviematch.components.AppBar
+import com.example.moviematch.components.BottomNavigationBar
 import com.example.moviematch.movies.Movie
 import com.example.moviematch.movies.MoviesViewModel
 
@@ -36,31 +39,50 @@ fun SearchScreen(navController: NavController,
     var query by remember { mutableStateOf("") }
     val movies by viewModel.movies.observeAsState(emptyList())
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        // Search TextField
-        TextField(
-            value = query,
-            onValueChange = { newQuery ->
-                query = newQuery
-                if (query.isNotEmpty()) {
-                    // Call searchMovies when query changes
-                    viewModel.searchMovies(query)
+    Scaffold(
+        topBar = {
+            AppBar(
+                onProfileClick = { navController.navigate("profile") },
+                viewModel = authViewModel
+            )
+        },
+        bottomBar = {
+            BottomNavigationBar(navController = navController)
+        }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                // Search TextField
+                TextField(
+                    value = query,
+                    onValueChange = { newQuery ->
+                        query = newQuery
+                        if (query.isNotEmpty()) {
+                            // Call searchMovies when query changes
+                            viewModel.searchMovies(query)
+                        }
+                    },
+                    label = { Text("Search for a movie") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Show results in a LazyColumn
+                LazyColumn {
+                    items(movies) { movie ->
+                        MovieItem(movie = movie)
+                    }
                 }
-            },
-            label = { Text("Search for a movie") },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Show results in a LazyColumn
-        LazyColumn {
-            items(movies) { movie ->
-                MovieItem(movie = movie)
             }
         }
     }

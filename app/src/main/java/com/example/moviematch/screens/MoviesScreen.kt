@@ -1,5 +1,6 @@
 package com.example.moviematch.screens
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -178,9 +179,15 @@ fun MoviesScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    // Close Button
+                    // Close Button (Deny Action)
                     IconButton(
-                        onClick = { /* Close action */ },
+                        onClick = {
+                            movie?.let { authViewModel.addMovieStatus(it.id.toString(), "disliked") { result ->
+                                Log.d("MovieStatus", result) // Logs success or error message
+                            } }
+                            viewModel.fetchRandomMovie()
+                            refreshKey++
+                        },
                         modifier = Modifier
                             .size(50.dp)
                             .clip(CircleShape)
@@ -213,7 +220,13 @@ fun MoviesScreen(
 
                     // Like Button
                     IconButton(
-                        onClick = { /* Like action */ },
+                        onClick = {
+                            movie?.let { authViewModel.addMovieStatus(it.id.toString(), "liked") { result ->
+                                Log.d("MovieStatus", result) // Logs success or error message
+                            } }
+                            viewModel.fetchRandomMovie()
+                            refreshKey++
+                        },
                         modifier = Modifier
                             .size(50.dp)
                             .clip(CircleShape)
@@ -230,5 +243,6 @@ fun MoviesScreen(
         }
     }
 }
+
 
 
