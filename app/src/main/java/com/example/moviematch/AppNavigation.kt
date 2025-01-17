@@ -14,6 +14,7 @@ import com.example.moviematch.screens.FriendsScreen
 import com.example.moviematch.screens.LandingScreen
 import com.example.moviematch.screens.LikesScreen
 import com.example.moviematch.screens.LoginRegisterScreen
+import com.example.moviematch.screens.MovieDetailScreen
 import com.example.moviematch.screens.MoviesScreen
 import com.example.moviematch.screens.ProfileScreen
 import com.example.moviematch.screens.SearchScreen
@@ -39,6 +40,10 @@ fun AppNavigation(startDestination: String) {
         ) { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
             FriendDetailScreen(username = username, navController = navController)
+        }
+        composable("movieDetail/{movieId}") { backStackEntry ->
+            val movieId = backStackEntry.arguments?.getString("movieId")?.toInt() ?: return@composable
+            MovieDetailScreen(movieId = movieId, navController = navController)
         }
     }
 }
