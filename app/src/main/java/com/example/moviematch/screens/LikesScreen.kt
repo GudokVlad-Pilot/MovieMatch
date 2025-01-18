@@ -1,5 +1,6 @@
 package com.example.moviematch.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,15 +53,18 @@ fun LikesScreen(
     viewModel: MoviesViewModel = viewModel(),
     authViewModel: AuthViewModel = viewModel()
 ) {
-    var movieList by remember { mutableStateOf<List<String>>(emptyList()) } // Movie list state
+    var movieList by remember { mutableStateOf<List<Pair<String, Boolean>>>(emptyList()) } // Movie list state with "isWatched" flag
     var isLoading by remember { mutableStateOf(false) } // Loading state
 
-    // Function to fetch liked movies
-    fun fetchLikedMovies(username: String) {
+    // Function to fetch movies by status
+    fun fetchMovies(username: String) {
         isLoading = true
-        authViewModel.getMoviesByStatus(username, "liked") { result ->
-            movieList = result
-            isLoading = false
+        authViewModel.getMoviesByStatus(username, "liked") { likedResult ->
+            authViewModel.getMoviesByStatus(username, "watched") { watchedResult ->
+                // Merge liked and watched movies, tagging watched with `true`
+                movieList = likedResult.map { it to false } + watchedResult.map { it to true }
+                isLoading = false
+            }
         }
     }
 
@@ -69,7 +73,7 @@ fun LikesScreen(
     // Initialize movie fetch when the screen is displayed
     LaunchedEffect(username) {
         if (username.isNotEmpty()) {
-            fetchLikedMovies(username)
+            fetchMovies(username)
         } else {
             // Handle the case where the user is not logged in
             movieList = emptyList()
@@ -97,7 +101,7 @@ fun LikesScreen(
             ) {
                 // Title of the screen
                 Text(
-                    text = "Liked Movies",
+                    text = "Movies",
                     style = MaterialTheme.typography.headlineLarge,
                     modifier = Modifier.padding(8.dp)
                 )
@@ -107,7 +111,7 @@ fun LikesScreen(
                     CircularProgressIndicator()
                 } else {
                     // Movie list
-                    LikedList(movieList, viewModel, navController)
+                    LikedWatchedList(movieList, viewModel, navController)
                 }
             }
         }
@@ -115,7 +119,11 @@ fun LikesScreen(
 }
 
 @Composable
-fun LikedList(movieList: List<String>, viewModel: MoviesViewModel = viewModel(), navController: NavController) {
+fun LikedWatchedList(
+    movieList: List<Pair<String, Boolean>>,
+    viewModel: MoviesViewModel = viewModel(),
+    navController: NavController
+) {
     if (movieList.isEmpty()) {
         Text(text = "No movies found.", style = MaterialTheme.typography.bodyMedium)
     } else {
@@ -124,7 +132,7 @@ fun LikedList(movieList: List<String>, viewModel: MoviesViewModel = viewModel(),
             columns = GridCells.Fixed(3),
             contentPadding = PaddingValues(8.dp)
         ) {
-            items(movieList) { movieId ->
+            items(movieList) { (movieId, isWatched) ->
                 // Use a remember to store the fetched movie data locally
                 var movie by remember { mutableStateOf<Movie?>(null) }
 
@@ -137,8 +145,9 @@ fun LikedList(movieList: List<String>, viewModel: MoviesViewModel = viewModel(),
 
                 // Display the movie once it's fetched
                 movie?.let {
-                    LikedItem(
+                    LikedWatchedItem(
                         movie = it,
+                        isWatched = isWatched,
                         navController = navController
                     )
                 }
@@ -148,8 +157,8 @@ fun LikedList(movieList: List<String>, viewModel: MoviesViewModel = viewModel(),
 }
 
 @Composable
-fun LikedItem(movie: Movie, navController: NavController) {
-    Card(
+fun LikedWatchedItem(movie: Movie, isWatched: Boolean, navController: NavController) {
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(4.dp)
@@ -157,39 +166,67 @@ fun LikedItem(movie: Movie, navController: NavController) {
                 // Navigate to movie details screen
                 navController.navigate("movieDetail/${movie.id}")
             },
-        elevation = CardDefaults.cardElevation(4.dp)
+        contentAlignment = Alignment.TopCenter // Ensures overlay text is positioned at the top center
     ) {
-        Column(
-            modifier = Modifier.padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        // Card with movie details
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            elevation = CardDefaults.cardElevation(4.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isWatched) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
+            )
         ) {
-            // Display movie poster
-            movie.posterPath?.let {
-                val imageUrl = "https://image.tmdb.org/t/p/w500${it}"
-                AsyncImage(
-                    model = imageUrl,
-                    contentDescription = null,
+            Column(
+                modifier = Modifier.padding(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Display movie poster
+                movie.posterPath?.let {
+                    val imageUrl = "https://image.tmdb.org/t/p/w500${it}"
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(150.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Movie title
+                Text(
+                    text = movie.title,
+                    style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(150.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop
+                        .padding(horizontal = 4.dp)
+                        .fillMaxWidth(),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center
                 )
             }
+        }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Movie title
+        // Watched overlay text
+        if (isWatched) {
             Text(
-                text = movie.title,
-                style = MaterialTheme.typography.bodyLarge,
+                text = "Watched",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier
-                    .padding(horizontal = 4.dp)
-                    .fillMaxWidth(),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center
+                    .background(
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                        shape = RoundedCornerShape(4.dp)
+                    )
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .align(Alignment.TopCenter)
             )
         }
     }
 }
+
+
+

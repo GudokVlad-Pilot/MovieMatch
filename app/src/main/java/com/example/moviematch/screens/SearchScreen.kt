@@ -114,6 +114,8 @@ fun MovieItem(movie: Movie, navController: NavController) {
 
         Spacer(modifier = Modifier.height(8.dp))
         Text(text = movie.overview, style = MaterialTheme.typography.bodyMedium)
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(text = "Release date: ${movie.release_date.substring(0, 4)}", style = MaterialTheme.typography.bodyLarge)
     }
 }
 
