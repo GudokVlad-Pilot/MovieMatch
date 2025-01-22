@@ -52,6 +52,7 @@ import coil.compose.AsyncImage
 import coil.compose.rememberImagePainter
 import com.example.moviematch.components.BottomBarIcon
 import com.example.moviematch.components.BottomNavigationBar
+import com.example.moviematch.movies.Movie
 import com.example.moviematch.movies.MoviesViewModel
 
 @Composable
@@ -64,9 +65,40 @@ fun MoviesScreen(
     val scrollState = rememberScrollState() // Remember the scroll state
     var refreshKey by remember { mutableStateOf(0) }
 
+    var movieList by remember { mutableStateOf<List<Pair<String, Boolean>>>(emptyList()) } // Movie list state with "isWatched" flag
+    var isLoading by remember { mutableStateOf(false) } // Loading state
+
+
+    // Function to fetch a random movie that is not liked or watched
+    fun fetchRandomMovie() {
+        val likedMovies = movieList.filter { !it.second }.map { it.first } // Liked but not watched
+        val watchedMovies = movieList.filter { it.second }.map { it.first } // Watched
+        viewModel.fetchRandomMovie(likedMovies, watchedMovies)
+    }
+
+    // Function to fetch movies by status
+    fun fetchMovies(username: String) {
+        isLoading = true
+        authViewModel.getMoviesByStatus(username, "liked") { likedResult ->
+            authViewModel.getMoviesByStatus(username, "watched") { watchedResult ->
+                // Merge liked and watched movies, tagging watched with true
+                movieList = likedResult.map { it to false } + watchedResult.map { it to true }
+                isLoading = false
+                fetchRandomMovie() // Fetch random movie after the lists are populated
+            }
+        }
+    }
+
+    val username = authViewModel.username
+
     // Fetch the random movie when the screen is loaded
-    LaunchedEffect(true) {
-        viewModel.fetchRandomMovie()
+    LaunchedEffect(username) {
+        if (username.isNotEmpty()) {
+            fetchMovies(username)
+        } else {
+            // Handle the case where the user is not logged in
+            movieList = emptyList()
+        }
     }
 
     LaunchedEffect(refreshKey) {
@@ -185,7 +217,7 @@ fun MoviesScreen(
                             movie?.let { authViewModel.addMovieStatus(it.id.toString(), "disliked") { result ->
                                 Log.d("MovieStatus", result) // Logs success or error message
                             } }
-                            viewModel.fetchRandomMovie()
+                            fetchMovies(username) // Fetch a new movie
                             refreshKey++
                         },
                         modifier = Modifier
@@ -203,7 +235,7 @@ fun MoviesScreen(
                     // Refresh Button
                     IconButton(
                         onClick = {
-                            viewModel.fetchRandomMovie()
+                            fetchMovies(username) // Fetch a new movie
                             refreshKey++
                         },
                         modifier = Modifier
@@ -224,7 +256,7 @@ fun MoviesScreen(
                             movie?.let { authViewModel.addMovieStatus(it.id.toString(), "liked") { result ->
                                 Log.d("MovieStatus", result) // Logs success or error message
                             } }
-                            viewModel.fetchRandomMovie()
+                            fetchMovies(username) // Fetch a new movie
                             refreshKey++
                         },
                         modifier = Modifier
@@ -243,6 +275,7 @@ fun MoviesScreen(
         }
     }
 }
+
 
 
 
