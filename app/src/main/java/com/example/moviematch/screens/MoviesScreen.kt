@@ -4,6 +4,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,6 +43,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavController
@@ -96,13 +100,12 @@ fun MoviesScreen(
         if (username.isNotEmpty()) {
             fetchMovies(username)
         } else {
-            // Handle the case where the user is not logged in
             movieList = emptyList()
         }
     }
 
     LaunchedEffect(refreshKey) {
-        scrollState.scrollTo(0) // Scroll to the top when refreshKey changes
+        scrollState.scrollTo(0)
     }
 
     Scaffold(
@@ -121,78 +124,85 @@ fun MoviesScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Movie content with scrollable details
-            movie?.let {
-                Column(
+            movie?.let { currentMovie ->
+                val swipeThreshold = with(LocalDensity.current) { 150.dp.toPx() }
+
+                var offsetX by remember { mutableStateOf(0f) }
+                var isSwiping by remember { mutableStateOf(false) }
+
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .verticalScroll(scrollState) // Make the content scrollable
-                        .padding(horizontal = 16.dp)
+                        .pointerInput(Unit) {
+                            detectHorizontalDragGestures(
+                                onDragStart = { isSwiping = true },
+                                onHorizontalDrag = { change, dragAmount ->
+                                    offsetX += dragAmount
+                                    change.consume()
+                                },
+                                onDragEnd = {
+                                    if (offsetX > swipeThreshold) {
+                                        // Swiped right - Like
+                                        authViewModel.addMovieStatus(
+                                            currentMovie.id.toString(),
+                                            "liked"
+                                        ) { result ->
+                                            Log.d("MovieStatus", result)
+                                        }
+                                        fetchMovies(username)
+                                    } else if (offsetX < -swipeThreshold) {
+                                        // Swiped left - Dislike
+                                        authViewModel.addMovieStatus(
+                                            currentMovie.id.toString(),
+                                            "disliked"
+                                        ) { result ->
+                                            Log.d("MovieStatus", result)
+                                        }
+                                        fetchMovies(username)
+                                    }
+                                    offsetX = 0f
+                                    isSwiping = false
+                                    refreshKey++
+                                }
+                            )
+                        }
+                        .graphicsLayer {
+                            translationX = offsetX
+                            rotationZ = offsetX / 50f
+                        }
                 ) {
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Movie Title
-                    Text(text = it.title, style = MaterialTheme.typography.headlineSmall)
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Poster Image, stretched from left to right
-                    val imageUrl = "https://image.tmdb.org/t/p/w500${it.posterPath}"
-                    AsyncImage(
-                        model = imageUrl,
-                        contentDescription = null,
+                    Column(
                         modifier = Modifier
-                            .fillMaxWidth() // Ensures full width
-                            .aspectRatio(2f / 3f) // Maintains aspect ratio for movie posters
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
+                            .fillMaxSize()
+                            .verticalScroll(scrollState)
+                            .padding(horizontal = 16.dp)
+                    ) {
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                    // Movie Overview
-                    Text(text = it.overview, style = MaterialTheme.typography.bodyLarge)
-                    Spacer(modifier = Modifier.height(16.dp))
+                        Text(text = currentMovie.title, style = MaterialTheme.typography.headlineSmall)
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                    // Rating
-                    Text(
-                        text = "Rating: ${"%.1f".format(it.rating)} / 10",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                        val imageUrl = "https://image.tmdb.org/t/p/w500${currentMovie.posterPath}"
+                        AsyncImage(
+                            model = imageUrl,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(2f / 3f)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                    // Production Countries
-                    if (it.countries.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(text = currentMovie.overview, style = MaterialTheme.typography.bodyLarge)
+                        Spacer(modifier = Modifier.height(16.dp))
+
                         Text(
-                            text = "Production Countries: ${
-                                it.countries.joinToString(", ") { country -> country.name }
-                            }",
+                            text = "Rating: ${"%.1f".format(currentMovie.rating)} / 10",
                             style = MaterialTheme.typography.bodyMedium
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(64.dp))
                     }
-
-                    // Cast
-                    if (it.cast.isNotEmpty()) {
-                        Text(
-                            text = "Cast: ${
-                                it.cast.joinToString(", ") { actor -> actor.name }
-                            }",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-
-                    // Producers
-                    if (it.producers.isNotEmpty()) {
-                        Text(
-                            text = "Producers: ${
-                                it.producers.joinToString(", ")
-                            }",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                    Spacer(modifier = Modifier.height(64.dp))
                 }
             } ?: run {
-                // Loading State
                 Text(
                     text = "Loading...",
                     modifier = Modifier.align(Alignment.Center),
@@ -200,7 +210,7 @@ fun MoviesScreen(
                 )
             }
 
-            // Fixed Buttons Overlay
+            // Buttons for Like, Dislike, and Refresh
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -211,13 +221,15 @@ fun MoviesScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    // Close Button (Deny Action)
+                    // Dislike Button
                     IconButton(
                         onClick = {
-                            movie?.let { authViewModel.addMovieStatus(it.id.toString(), "disliked") { result ->
-                                Log.d("MovieStatus", result) // Logs success or error message
-                            } }
-                            fetchMovies(username) // Fetch a new movie
+                            movie?.let {
+                                authViewModel.addMovieStatus(it.id.toString(), "disliked") { result ->
+                                    Log.d("MovieStatus", result)
+                                }
+                            }
+                            fetchMovies(username)
                             refreshKey++
                         },
                         modifier = Modifier
@@ -227,7 +239,7 @@ fun MoviesScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Deny",
+                            contentDescription = "Dislike",
                             tint = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
@@ -235,7 +247,7 @@ fun MoviesScreen(
                     // Refresh Button
                     IconButton(
                         onClick = {
-                            fetchMovies(username) // Fetch a new movie
+                            fetchMovies(username)
                             refreshKey++
                         },
                         modifier = Modifier
@@ -253,10 +265,12 @@ fun MoviesScreen(
                     // Like Button
                     IconButton(
                         onClick = {
-                            movie?.let { authViewModel.addMovieStatus(it.id.toString(), "liked") { result ->
-                                Log.d("MovieStatus", result) // Logs success or error message
-                            } }
-                            fetchMovies(username) // Fetch a new movie
+                            movie?.let {
+                                authViewModel.addMovieStatus(it.id.toString(), "liked") { result ->
+                                    Log.d("MovieStatus", result)
+                                }
+                            }
+                            fetchMovies(username)
                             refreshKey++
                         },
                         modifier = Modifier
