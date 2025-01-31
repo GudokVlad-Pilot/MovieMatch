@@ -4,6 +4,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -27,6 +29,8 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -42,6 +46,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavController
@@ -52,6 +59,7 @@ import coil.compose.AsyncImage
 import coil.compose.rememberImagePainter
 import com.example.moviematch.components.BottomBarIcon
 import com.example.moviematch.components.BottomNavigationBar
+import com.example.moviematch.movies.Movie
 import com.example.moviematch.movies.MoviesViewModel
 
 @Composable
@@ -64,13 +72,43 @@ fun MoviesScreen(
     val scrollState = rememberScrollState() // Remember the scroll state
     var refreshKey by remember { mutableStateOf(0) }
 
+    var movieList by remember { mutableStateOf<List<Pair<String, Boolean>>>(emptyList()) } // Movie list state with "isWatched" flag
+    var isLoading by remember { mutableStateOf(false) } // Loading state
+
+
+    // Function to fetch a random movie that is not liked or watched
+    fun fetchRandomMovie() {
+        val likedMovies = movieList.filter { !it.second }.map { it.first } // Liked but not watched
+        val watchedMovies = movieList.filter { it.second }.map { it.first } // Watched
+        viewModel.fetchRandomMovie(likedMovies, watchedMovies)
+    }
+
+    // Function to fetch movies by status
+    fun fetchMovies(username: String) {
+        isLoading = true
+        authViewModel.getMoviesByStatus(username, "liked") { likedResult ->
+            authViewModel.getMoviesByStatus(username, "watched") { watchedResult ->
+                // Merge liked and watched movies, tagging watched with true
+                movieList = likedResult.map { it to false } + watchedResult.map { it to true }
+                isLoading = false
+                fetchRandomMovie() // Fetch random movie after the lists are populated
+            }
+        }
+    }
+
+    val username = authViewModel.username
+
     // Fetch the random movie when the screen is loaded
-    LaunchedEffect(true) {
-        viewModel.fetchRandomMovie()
+    LaunchedEffect(username) {
+        if (username.isNotEmpty()) {
+            fetchMovies(username)
+        } else {
+            movieList = emptyList()
+        }
     }
 
     LaunchedEffect(refreshKey) {
-        scrollState.scrollTo(0) // Scroll to the top when refreshKey changes
+        scrollState.scrollTo(0)
     }
 
     Scaffold(
@@ -89,78 +127,58 @@ fun MoviesScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Movie content with scrollable details
-            movie?.let {
-                Column(
+            movie?.let { currentMovie ->
+                val swipeThreshold = with(LocalDensity.current) { 150.dp.toPx() }
+
+                var offsetX by remember { mutableStateOf(0f) }
+                var isSwiping by remember { mutableStateOf(false) }
+
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .verticalScroll(scrollState) // Make the content scrollable
-                        .padding(horizontal = 16.dp)
+                        .pointerInput(Unit) {
+                            detectHorizontalDragGestures(
+                                onDragStart = { isSwiping = true },
+                                onHorizontalDrag = { change, dragAmount ->
+                                    offsetX += dragAmount
+                                    change.consume()
+                                },
+                                onDragEnd = {
+                                    if (offsetX > swipeThreshold) {
+                                        // Swiped right - Like
+                                        movie?.let {
+                                            authViewModel.addMovieStatus(it.id.toString(), "liked") { result ->
+                                                Log.d("MovieStatus", result)
+                                            }
+                                        }
+                                        fetchMovies(username)
+                                        refreshKey++
+                                    } else if (offsetX < -swipeThreshold) {
+                                        // Swiped left - Dislike
+                                        movie?.let {
+                                            authViewModel.addMovieStatus(it.id.toString(), "disliked") { result ->
+                                                Log.d("MovieStatus", result)
+                                            }
+                                        }
+                                        fetchMovies(username)
+                                        refreshKey++
+                                    }
+                                    offsetX = 0f
+                                    isSwiping = false
+                                }
+                            )
+                        }
+                        .graphicsLayer {
+                            translationX = offsetX
+                            rotationZ = offsetX / 50f
+                        }
                 ) {
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Movie Title
-                    Text(text = it.title, style = MaterialTheme.typography.headlineSmall)
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Poster Image, stretched from left to right
-                    val imageUrl = "https://image.tmdb.org/t/p/w500${it.posterPath}"
-                    AsyncImage(
-                        model = imageUrl,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .fillMaxWidth() // Ensures full width
-                            .aspectRatio(2f / 3f) // Maintains aspect ratio for movie posters
+                    MovieCard(
+                        movie = currentMovie,
+                        modifier = Modifier.align(Alignment.Center)
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Movie Overview
-                    Text(text = it.overview, style = MaterialTheme.typography.bodyLarge)
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Rating
-                    Text(
-                        text = "Rating: ${"%.1f".format(it.rating)} / 10",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-
-                    // Production Countries
-                    if (it.countries.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Production Countries: ${
-                                it.countries.joinToString(", ") { country -> country.name }
-                            }",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-
-                    // Cast
-                    if (it.cast.isNotEmpty()) {
-                        Text(
-                            text = "Cast: ${
-                                it.cast.joinToString(", ") { actor -> actor.name }
-                            }",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-
-                    // Producers
-                    if (it.producers.isNotEmpty()) {
-                        Text(
-                            text = "Producers: ${
-                                it.producers.joinToString(", ")
-                            }",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                    Spacer(modifier = Modifier.height(64.dp))
                 }
             } ?: run {
-                // Loading State
                 Text(
                     text = "Loading...",
                     modifier = Modifier.align(Alignment.Center),
@@ -168,7 +186,7 @@ fun MoviesScreen(
                 )
             }
 
-            // Fixed Buttons Overlay
+            // Buttons for Like, Dislike, and Refresh
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -179,13 +197,15 @@ fun MoviesScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    // Close Button (Deny Action)
+                    // Dislike Button
                     IconButton(
                         onClick = {
-                            movie?.let { authViewModel.addMovieStatus(it.id.toString(), "disliked") { result ->
-                                Log.d("MovieStatus", result) // Logs success or error message
-                            } }
-                            viewModel.fetchRandomMovie()
+                            movie?.let {
+                                authViewModel.addMovieStatus(it.id.toString(), "disliked") { result ->
+                                    Log.d("MovieStatus", result)
+                                }
+                            }
+                            fetchMovies(username)
                             refreshKey++
                         },
                         modifier = Modifier
@@ -195,7 +215,7 @@ fun MoviesScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Deny",
+                            contentDescription = "Dislike",
                             tint = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
@@ -203,7 +223,7 @@ fun MoviesScreen(
                     // Refresh Button
                     IconButton(
                         onClick = {
-                            viewModel.fetchRandomMovie()
+                            fetchMovies(username)
                             refreshKey++
                         },
                         modifier = Modifier
@@ -221,10 +241,12 @@ fun MoviesScreen(
                     // Like Button
                     IconButton(
                         onClick = {
-                            movie?.let { authViewModel.addMovieStatus(it.id.toString(), "liked") { result ->
-                                Log.d("MovieStatus", result) // Logs success or error message
-                            } }
-                            viewModel.fetchRandomMovie()
+                            movie?.let {
+                                authViewModel.addMovieStatus(it.id.toString(), "liked") { result ->
+                                    Log.d("MovieStatus", result)
+                                }
+                            }
+                            fetchMovies(username)
                             refreshKey++
                         },
                         modifier = Modifier
@@ -244,5 +266,50 @@ fun MoviesScreen(
     }
 }
 
+@Composable
+fun MovieCard(
+    movie: Movie, // Replace with your actual Movie data class
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(8.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+        ) {
+            Text(
+                text = movie.title,
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
 
+            val imageUrl = "https://image.tmdb.org/t/p/w500${movie.posterPath}"
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(2f / 3f)
+                    .clip(RoundedCornerShape(12.dp))
+            )
+            Spacer(modifier = Modifier.height(16.dp))
 
+            Text(text = movie.overview, style = MaterialTheme.typography.bodyLarge)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Rating: ${"%.1f".format(movie.rating)} / 10",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(modifier = Modifier.height(64.dp))
+        }
+    }
+}

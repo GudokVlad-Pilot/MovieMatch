@@ -25,7 +25,7 @@ class MoviesViewModel : ViewModel() {
         .build()
     private val service = retrofit.create(MovieService::class.java)
 
-    fun fetchRandomMovie() {
+    fun fetchRandomMovie(likedMovies: List<String>, watchedMovies: List<String>) {
         viewModelScope.launch {
             try {
                 // Get the user's default language (e.g., "en" for English, "fr" for French)
@@ -34,8 +34,13 @@ class MoviesViewModel : ViewModel() {
                 // Fetch popular movies in the user's language
                 val response = service.getPopularMovies(apiKey, language)
 
-                // Filter movies with valid poster paths
-                val validMovies = response.results.filter { !it.posterPath.isNullOrEmpty() }
+                // Filter movies with valid poster paths and not already liked or watched
+                val validMovies = response.results.filter { movie ->
+                    !movie.posterPath.isNullOrEmpty() &&
+                            movie.id.toString() !in likedMovies &&
+                            movie.id.toString() !in watchedMovies
+                }
+
                 if (validMovies.isNotEmpty()) {
                     // Pick a random movie
                     val randomMovie = validMovies.random()
@@ -66,7 +71,7 @@ class MoviesViewModel : ViewModel() {
 
                     _movie.postValue(enrichedMovie)
                 } else {
-                    Log.e("MoviesViewModel", "No valid movies with poster paths found.")
+                    Log.e("MoviesViewModel", "No valid movies found that are not already liked or watched.")
                 }
             } catch (e: Exception) {
                 // Handle errors
@@ -74,6 +79,7 @@ class MoviesViewModel : ViewModel() {
             }
         }
     }
+
 
     fun searchMovies(query: String) {
         viewModelScope.launch {
