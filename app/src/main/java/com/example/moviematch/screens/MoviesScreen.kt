@@ -2,6 +2,15 @@ package com.example.moviematch.screens
 
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -75,6 +84,8 @@ fun MoviesScreen(
     var movieList by remember { mutableStateOf<List<Pair<String, Boolean>>>(emptyList()) } // Movie list state with "isWatched" flag
     var isLoading by remember { mutableStateOf(false) } // Loading state
 
+    val movieState = remember { MutableTransitionState(movie) }
+    movieState.targetState = movie
 
     // Function to fetch a random movie that is not liked or watched
     fun fetchRandomMovie() {
@@ -133,50 +144,58 @@ fun MoviesScreen(
                 var offsetX by remember { mutableStateOf(0f) }
                 var isSwiping by remember { mutableStateOf(false) }
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .pointerInput(Unit) {
-                            detectHorizontalDragGestures(
-                                onDragStart = { isSwiping = true },
-                                onHorizontalDrag = { change, dragAmount ->
-                                    offsetX += dragAmount
-                                    change.consume()
-                                },
-                                onDragEnd = {
-                                    if (offsetX > swipeThreshold) {
-                                        // Swiped right - Like
-                                        movie?.let {
-                                            authViewModel.addMovieStatus(it.id.toString(), "liked") { result ->
-                                                Log.d("MovieStatus", result)
+                AnimatedContent(
+                    targetState = movie,
+                    transitionSpec = {
+                        slideInVertically { it } + fadeIn() togetherWith slideOutHorizontally { it } + fadeOut()
+                    },
+                    label = "MovieTransition"
+                ) { currentMovie ->
+                    currentMovie?.let {
+                        var offsetX by remember { mutableStateOf(0f) }
+                        val animatedOffsetX by animateFloatAsState(
+                            targetValue = if (isSwiping) offsetX else 0f,
+                            animationSpec = tween(durationMillis = 300)
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(Unit) {
+                                    detectHorizontalDragGestures(
+                                        onDragStart = { isSwiping = true },
+                                        onHorizontalDrag = { change, dragAmount ->
+                                            offsetX += dragAmount
+                                            change.consume()
+                                        },
+                                        onDragEnd = {
+                                            if (offsetX > swipeThreshold) {
+                                                // Swiped right (like)
+                                                authViewModel.addMovieStatus(it.id.toString(), "liked") { _ -> }
+                                                fetchMovies(username)
+                                                refreshKey++
+                                            } else if (offsetX < -swipeThreshold) {
+                                                // Swiped left (dislike)
+                                                authViewModel.addMovieStatus(it.id.toString(), "disliked") { _ -> }
+                                                fetchMovies(username)
+                                                refreshKey++
                                             }
+                                            offsetX = 0f
+                                            isSwiping = false
                                         }
-                                        fetchMovies(username)
-                                        refreshKey++
-                                    } else if (offsetX < -swipeThreshold) {
-                                        // Swiped left - Dislike
-                                        movie?.let {
-                                            authViewModel.addMovieStatus(it.id.toString(), "disliked") { result ->
-                                                Log.d("MovieStatus", result)
-                                            }
-                                        }
-                                        fetchMovies(username)
-                                        refreshKey++
-                                    }
-                                    offsetX = 0f
-                                    isSwiping = false
+                                    )
                                 }
+                                .graphicsLayer {
+                                    translationX = animatedOffsetX
+                                    rotationZ = animatedOffsetX / 50f
+                                }
+                        ) {
+                            MovieCard(
+                                movie = it,
+                                modifier = Modifier.align(Alignment.Center)
                             )
                         }
-                        .graphicsLayer {
-                            translationX = offsetX
-                            rotationZ = offsetX / 50f
-                        }
-                ) {
-                    MovieCard(
-                        movie = currentMovie,
-                        modifier = Modifier.align(Alignment.Center)
-                    )
+                    }
                 }
             } ?: run {
                 Text(
