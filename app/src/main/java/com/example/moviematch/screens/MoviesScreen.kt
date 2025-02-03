@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -83,6 +84,7 @@ fun MoviesScreen(
 
     var movieList by remember { mutableStateOf<List<Pair<String, Boolean>>>(emptyList()) } // Movie list state with "isWatched" flag
     var isLoading by remember { mutableStateOf(false) } // Loading state
+    var swipeDirection by remember { mutableStateOf(0f) }
 
     val movieState = remember { MutableTransitionState(movie) }
     movieState.targetState = movie
@@ -147,7 +149,11 @@ fun MoviesScreen(
                 AnimatedContent(
                     targetState = movie,
                     transitionSpec = {
-                        slideInVertically { it } + fadeIn() togetherWith slideOutHorizontally { it } + fadeOut()
+                        when {
+                            swipeDirection < 0 -> slideInVertically { it } + fadeIn() togetherWith slideOutHorizontally { -it } + fadeOut()
+                            swipeDirection > 0 -> slideInVertically { it } + fadeIn() togetherWith slideOutHorizontally { it } + fadeOut()
+                            else -> slideInVertically { it } + fadeIn() togetherWith slideOutVertically { -it } + fadeOut()
+                        }
                     },
                     label = "MovieTransition"
                 ) { currentMovie ->
@@ -171,12 +177,18 @@ fun MoviesScreen(
                                         onDragEnd = {
                                             if (offsetX > swipeThreshold) {
                                                 // Swiped right (like)
-                                                authViewModel.addMovieStatus(it.id.toString(), "liked") { _ -> }
+                                                authViewModel.addMovieStatus(it.id.toString(), "liked") { result ->
+                                                    Log.d("MovieStatus", result)
+                                                }
+                                                swipeDirection = 1000f
                                                 fetchMovies(username)
                                                 refreshKey++
                                             } else if (offsetX < -swipeThreshold) {
                                                 // Swiped left (dislike)
-                                                authViewModel.addMovieStatus(it.id.toString(), "disliked") { _ -> }
+                                                authViewModel.addMovieStatus(it.id.toString(), "disliked") { result ->
+                                                    Log.d("MovieStatus", result)
+                                                }
+                                                swipeDirection = -1000f
                                                 fetchMovies(username)
                                                 refreshKey++
                                             }
@@ -199,7 +211,7 @@ fun MoviesScreen(
                 }
             } ?: run {
                 Text(
-                    text = "Loading...",
+                    text = "We are fetching new movies for you. Please, wait...",
                     modifier = Modifier.align(Alignment.Center),
                     style = MaterialTheme.typography.bodyLarge
                 )
@@ -224,6 +236,7 @@ fun MoviesScreen(
                                     Log.d("MovieStatus", result)
                                 }
                             }
+                            swipeDirection = -1000f
                             fetchMovies(username)
                             refreshKey++
                         },
@@ -242,6 +255,7 @@ fun MoviesScreen(
                     // Refresh Button
                     IconButton(
                         onClick = {
+                            swipeDirection = 0f
                             fetchMovies(username)
                             refreshKey++
                         },
@@ -265,6 +279,7 @@ fun MoviesScreen(
                                     Log.d("MovieStatus", result)
                                 }
                             }
+                            swipeDirection = 1000f
                             fetchMovies(username)
                             refreshKey++
                         },
@@ -284,6 +299,7 @@ fun MoviesScreen(
         }
     }
 }
+
 
 @Composable
 fun MovieCard(
