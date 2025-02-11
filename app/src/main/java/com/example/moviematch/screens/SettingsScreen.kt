@@ -1,6 +1,7 @@
 package com.example.moviematch.screens
 
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -31,6 +33,7 @@ import com.example.moviematch.components.BottomNavigationBar
 fun SettingsScreen(navController: NavController, authViewModel: AuthViewModel = viewModel()) {
     // State to control which confirmation dialog is shown
     var showDialog by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -93,6 +96,7 @@ fun SettingsScreen(navController: NavController, authViewModel: AuthViewModel = 
                                     authViewModel.deleteMoviesByStatus(status) { result ->
                                         Log.d("MovieStatusDelete", result)
                                     }
+                                    Toast.makeText(context, "Successfully deleted $status movies", Toast.LENGTH_SHORT).show()
                                 }
                             ) {
                                 Text("Yes, Delete")

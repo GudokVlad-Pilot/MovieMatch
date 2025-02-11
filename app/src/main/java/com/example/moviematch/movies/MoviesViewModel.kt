@@ -13,9 +13,9 @@ import com.example.moviematch.BuildConfig
 
 class MoviesViewModel : ViewModel() {
 
-    private val _movie = MutableLiveData<Movie>()
+    private val _movie = MutableLiveData<Movie?>()
     private val _movies = MutableLiveData<List<Movie>>()
-    val movie: LiveData<Movie> get() = _movie
+    val movie: MutableLiveData<Movie?> get() = _movie
     val movies: LiveData<List<Movie>> get() = _movies
 
     private val apiKey = BuildConfig.API_KEY
@@ -71,6 +71,7 @@ class MoviesViewModel : ViewModel() {
 
                     _movie.postValue(enrichedMovie)
                 } else {
+                    _movie.postValue(null)
                     Log.e("MoviesViewModel", "No valid movies found that are not already liked or watched.")
                 }
             } catch (e: Exception) {
@@ -79,7 +80,6 @@ class MoviesViewModel : ViewModel() {
             }
         }
     }
-
 
     fun searchMovies(query: String) {
         viewModelScope.launch {
